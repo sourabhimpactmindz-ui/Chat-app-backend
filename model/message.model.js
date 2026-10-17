@@ -20,6 +20,11 @@ const MessageSchema =  new mongoose.Schema({
         default : "",
     },
 
+    mentions : [{
+        type : mongoose.Schema.Types.ObjectId,
+        ref : "User",
+    }],
+
     messageType: {
         type : String , 
         enum : ["text" , "image" , "video" , "file"],

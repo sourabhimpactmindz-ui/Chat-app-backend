@@ -3,6 +3,7 @@ import dbconnect from "./config/db.config.js";
 import http from 'http';
 import { Server } from "socket.io";
 import { socketHandler } from "./config/Sockit.js";
+import 'dotenv/config';
 const PORT = process.env.PORT || 3009
 
 const server = http.createServer(app);
@@ -15,6 +16,7 @@ export const io = new Server(server , {
 })
 
 socketHandler(io);
+console.log('Mongo URI loaded:', Boolean(process.env.MONGO_URI));
 
 await dbconnect()
 server.listen(PORT , () => {

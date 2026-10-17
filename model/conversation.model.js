@@ -37,6 +37,12 @@ const ConversationSchema = new mongoose.Schema(
         type : mongoose.Schema.Types.ObjectId,
         ref : "User"
     },
+
+    groupAdmins : {
+        type : mongoose.Schema.Types.ObjectId,
+        ref : "User"
+    },
+
     unreadCount  : {
         type : Map,
         of : Number,

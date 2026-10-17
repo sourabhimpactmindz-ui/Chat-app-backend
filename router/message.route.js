@@ -4,6 +4,7 @@ import express from 'express'
 
 const Messagerouter = express.Router();
 
+Messagerouter.post("/send", userAuth, sendMessage);
 Messagerouter.post("/send/:receiverId" , userAuth ,sendMessage)
 Messagerouter.get("/messages/:conversationId",userAuth,getMessage)
 Messagerouter.post("/New-message",userAuth,createConversation)

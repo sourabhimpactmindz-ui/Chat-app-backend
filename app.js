@@ -8,10 +8,12 @@ import cookieParser from 'cookie-parser';
 dotenv.config();
 
 const app = express();
+app.set("trust proxy",1)
 
 app.use(express.json())
 app.use(cors({
-    origin : "http://localhost:3000",
+    origin : ["http://localhost:3000",
+  "http://192.168.1.4:3000"],
     credentials : true
 }))
 app.use(cookieParser())

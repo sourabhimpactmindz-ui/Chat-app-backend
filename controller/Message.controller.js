@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { getReceiverSocketId } from "../config/Sockit.js";
 import  { Conversation } from "../model/conversation.model.js";
 import { Message } from "../model/message.model.js";
@@ -5,62 +6,88 @@ import { User } from "../model/user.model.js";
 import { io } from "../server.js";
 
 
-export const sendMessage = async(req,res)=>{
-    const senderId = req.userid;
-    const receiverId = req.params.receiverId;
+export const sendMessage = async (req, res) => {
+  const senderId = req.userid;
 
+  try {
+    const { text, conversationId } = req.body;
+    // receiverId params se bhi chalega, body se bhi
+    const receiverId = req.params.receiverId || req.body.receiverId;
 
-    try{
-
-        const { text } = req.body;
-
-        let conversation = await Conversation.findOne({
-            participants : {
-                $all : [senderId , receiverId]
-            }
-        });
-
-        if(!conversation){
-            conversation = await Conversation.create({
-                participants : [senderId, receiverId]
-            });
-        }
-
-        const message = await Message.create({
-            conversation : conversation._id,
-            sender : senderId,
-            text
-        });
-
-        const populatedMessage = await Message.findById(message._id)
-    .populate("sender", "name chatId images");
-
-    
-
-        conversation.lastMessage = message._id;
-        await conversation.save();
-
-        const receiverSocketId = getReceiverSocketId(receiverId);
-        if (receiverSocketId) {
-    io.to(receiverSocketId).emit(
-        "receiver-message",
-        populatedMessage
-    );
-}
-
-        if(receiverSocketId){
-            io.to(receiverSocketId).emit('receiver-message',message)
-        }
-
-        res.status(201).json({success : true , status:true, message})
-
-
-    }catch(err){
-        console.log(err)
-        return res.status(500).json({message : "server error",status : false})
+    if (!text?.trim()) {
+      return res.status(400).json({ message: "Text is required", status: false });
     }
-}
 
+    let conversation;
+
+    if (conversationId) {
+      // GROUP (ya existing conversation)
+      if (!mongoose.isValidObjectId(conversationId)) {
+        return res.status(400).json({ message: "Invalid conversation id", status: false });
+      }
+
+      conversation = await Conversation.findById(conversationId);
+
+      if (!conversation) {
+        return res.status(404).json({ message: "Conversation not found", status: false });
+      }
+
+      const isMember = conversation.participants.some(
+        (id) => id.toString() === String(senderId)
+      );
+      if (!isMember) {
+        return res.status(403).json({ message: "You are not a member", status: false });
+      }
+    } else {
+      // 1:1 CHAT
+      if (!receiverId || !mongoose.isValidObjectId(receiverId)) {
+        return res.status(400).json({ message: "Valid receiverId required", status: false });
+      }
+
+      conversation = await Conversation.findOne({
+        isGroup: { $ne: true },            // group conversation galti se match na ho
+        participants: { $all: [senderId, receiverId], $size: 2 },
+      });
+
+      if (!conversation) {
+        conversation = await Conversation.create({
+          participants: [senderId, receiverId],
+        });
+      }
+    }
+
+    const message = await Message.create({
+      conversation: conversation._id,
+      sender: senderId,
+      text: text.trim(),
+    });
+
+    const populatedMessage = await Message.findById(message._id).populate(
+      "sender",
+      "name chatId images"
+    );
+
+    conversation.lastMessage = message._id;
+    await conversation.save();
+
+    // sab participants ko bhejo (sender ko chhodkar)
+    conversation.participants.forEach((id) => {
+      if (String(id) === String(senderId)) return;
+
+      const socketId = getReceiverSocketId(String(id));
+      if (socketId) {
+        io.to(socketId).emit("receive-message", populatedMessage);
+      }
+    });
+
+    return res
+      .status(201)
+      .json({ success: true, status: true, message: populatedMessage });
+  } catch (err) {
+    console.log(err);
+    return res.status(500).json({ message: "server error", status: false });
+  }
+};
 
 export const getMessage = async(req,res) => {
 
